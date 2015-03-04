@@ -2,7 +2,7 @@
 * constants here
 */
 
-bool interruptInProcess 	= false;
+bool interruptInProcess		= false;
 baudRate 					= 115200;
 networkLED					= PIN_13;
 powerLED					= PIN_15;
@@ -14,9 +14,6 @@ void setup()
 	setParameters();
 	
 	initSIM900();
-	
-	
-	
 }
 
 void loop()
@@ -36,7 +33,7 @@ void loop()
 	}
 }
 
-setParameters()
+void setParameters()
 {
 	//can set pin output modes, default values here
 	
@@ -45,7 +42,7 @@ setParameters()
 }
 
 
-initSIM900()
+void initSIM900()
 {
 	//wait a few seconds for sim900 power on sequence to complete
 	delay(5000);
@@ -78,12 +75,12 @@ initSIM900()
 	
 }
 
-preCallSetup() {
+void preCallSetup() {
 
-	
+	//we can check the balance/credit info here to inform if there is not enough balance etc
 }
 
-makeCall() {
+void makeCall() {
 	
 	Serial.write("AT+CHFA=0");
 	
@@ -98,15 +95,27 @@ makeCall() {
 	Serial.write("ATH");
 }
 
-postCallSetup() {
-
+void postCallSetup() {
+	
+	//we can process any log,credit,time info here
 }
 
 void sendSMS() {}
 
-void onSMSRecvd() {}
+void onSMSRecvd() {
 
-void saveNumberInPhonebook() {}
+	//called when sim900 receives an SMS
+}
+
+void saveNumInPhonebook() {
+	
+	Serial.write("AT+CPBS=\"SM\"");
+	
+	//saves the number at location LOC in memory with name NAME
+	Serial.write("AT+CPBW=LOC,\"+3xxxxxxx\",92,\"NAME\");
+
+
+}
 
 void queryModuleInfo() {
 	
