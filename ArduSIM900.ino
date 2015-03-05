@@ -3,9 +3,9 @@
 */
 
 bool interruptInProcess		= false;
-baudRate 					= 115200;
-networkLED					= PIN_13;
-powerLED					= PIN_15;
+int baudRate 					= 115200;
+int networkLED					= 13;
+int powerLED					= 15;
 
 
 void setup()
@@ -112,7 +112,7 @@ void saveNumInPhonebook() {
 	Serial.write("AT+CPBS=\"SM\"");
 	
 	//saves the number at location LOC in memory with name NAME
-	Serial.write("AT+CPBW=LOC,\"+3xxxxxxx\",92,\"NAME\");
+	Serial.write("AT+CPBW=LOC,\"+3xxxxxxx\",92,\"NAME\"");
 
 
 }
