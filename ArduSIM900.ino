@@ -36,21 +36,6 @@ void setup()
 
 void loop()
 {
-
-	/*if ( interruptReceived() && !interruptInProcess)
-	{	
-		interruptInProcess = true;
-		
-		preCallSetup();
-		
-		makeCall();
-		
-		postCallSetup();
-		
-		interruptInProcess = false;
-	}
-        */
-        
         checkPushButton();
         
         if ( sim.available() > 0 )
