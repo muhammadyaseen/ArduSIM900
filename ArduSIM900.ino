@@ -7,18 +7,31 @@
 
 SoftwareSerial sim(10,11);    // rx,tx
 
-bool interruptInProcess		= false;
+boolean interruptInProcess	= false;
 int baudRate 			= 9600;
 boolean stringComplete          = false;
 String  inputString = "";
-String ctrlZ                    = "\x1A";
+char ctrlZ                    = '\x1A';
+int buttonPin                 = 5; //btn is connected to this pin
+int buttonState;             // the current reading from the input pin
+int lastButtonState           = LOW;   // the previous reading from the input pin
+
+long lastDebounceTime         = 0;  // the last time the output pin was toggled
+long debounceDelay            = 50;    // the debounce time; increase if the output flickers
+
 void setup()
 {
+        pinMode(buttonPin, INPUT);
+        
 	inputString.reserve(300);
         
         initSIM900();
         
 	setParameters();
+
+        //delay(1000);
+        
+        //sendSMS();
 }
 
 void loop()
@@ -37,6 +50,9 @@ void loop()
 		interruptInProcess = false;
 	}
         */
+        
+        checkPushButton();
+        
         if ( sim.available() > 0 )
         {
            softSerialEvent();
@@ -50,6 +66,50 @@ void loop()
         }
 }
 
+void checkPushButton()
+{
+  // read the state of the switch into a local variable:
+  int reading = digitalRead(buttonPin);
+
+  // check to see if you just pressed the button 
+  // (i.e. the input went from LOW to HIGH),  and you've waited 
+  // long enough since the last press to ignore any noise:  
+
+  // If the switch changed, due to noise or pressing:
+  if (reading != lastButtonState) {
+    // reset the debouncing timer
+    lastDebounceTime = millis();
+  } 
+  
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    // whatever the reading is at, it's been there for longer
+    // than the debounce delay, so take it as the actual current state:
+
+    // if the button state has changed:
+    if (reading != buttonState) {
+      buttonState = reading;
+
+      // only toggle the LED if the new button state is HIGH
+      if (buttonState == HIGH && !interruptInProcess) {
+        Serial.println("Push btn PRESSED");
+        
+        interruptInProcess = true;
+        
+        makeCall();
+        
+      }
+      else 
+      {
+        Serial.println("Push btn RELEASED");
+      }
+    }
+  }
+  
+  // save the reading.  Next time through the loop,
+  // it'll be the lastButtonState:
+  lastButtonState = reading; 
+  
+}
 void setParameters()
 {
 	//can set pin output modes, default values here
@@ -57,6 +117,8 @@ void setParameters()
         //set module in 'text' mode
         
         sim.write("AT+CMGF=1\r");
+        
+        delay(500);
         
         //Send SMS msgs to Arduino serial port  
         //AT+ACNMI=mode,mt,bm,ds,bfr
@@ -72,19 +134,19 @@ void initSIM900()
       
         Serial.begin(baudRate);
         
-        sim.begin(9600);
+        sim.begin(baudRate);
         
 	//wait a few seconds for sim900 power on sequence to complete
-	delay(3000);
+	delay(5000);
 	
 	//enter command mode
-	sim.write("+++\r");
+	//sim.write("+++\r");
 	delay(500);
 
 	//required for auto-bauding to figure out baud rate
 	sim.write("AT\r");
 	
-	delay(3000);
+	delay(2000);
 
         Serial.println("SIm900 initialization done...");
 
@@ -97,17 +159,14 @@ void preCallSetup() {
 
 void makeCall() {
 	
-	Serial.write("AT+CHFA=0\r");
+        Serial.write("Initiating call...");
 	
-	Serial.write("ATL3\r");
+	sim.write("ATD+923412260853;\r");
 	
-	Serial.write("AT+CMUT=1\r");
-	
-	Serial.write("ATD+9234122xxxxx\r");
-	
-	delay(30000);
-	
-	Serial.write("ATH\r");
+	delay(3000);
+
+        interruptInProcess = false;
+
 }
 
 void postCallSetup() {
@@ -115,7 +174,27 @@ void postCallSetup() {
 	//we can process any log,credit,time info here
 }
 
-void sendSMS() {}
+void sendSMS() {
+  
+        String msgText = "Hello user, This is a test message \r\n";
+        
+       // msgText = "AT+CMGS=\"+923122009338\"\r" + msgText + ctrlZ ;
+        
+        //Serial.println(msgText);
+        
+        //sim.write( msgText.c_str());
+        sim.write("AT+CMEE=2\r");
+        delay(500);
+         sim.write("AT+CMEE?\r");
+          delay(500);
+          
+        sim.print("AT+CMGS=\"+923412260853\"\r");
+        delay(100);
+        sim.print("Test");
+        delay(100);
+        sim.write(0x1A);
+         delay(500);
+}
 
 void SMSRecvd() {
 
@@ -158,6 +237,9 @@ boolean parseConfigMsg(String msg )
         Serial.println("YES : This is a config SMS");
         //each num is/should be 11 digits long. 
         
+        //TODO: Extract the SENDER's number 
+        
+        
         //First num is from index 4 to 15
         String num1 = msg.substring(4,15);
         
@@ -181,7 +263,7 @@ boolean parseConfigMsg(String msg )
         
         //save numbers to Arduino's EEPROM
         
-        /*saveToEEPROM(num1, 10);
+        saveToEEPROM(num1, 10);
         
         saveToEEPROM(num2, 21);
         
@@ -189,13 +271,14 @@ boolean parseConfigMsg(String msg )
         
         saveToEEPROM(num4, 43);
         
-        saveToEEPROM(num5, 54);*/
+        saveToEEPROM(num5, 54);
         
+        //We read nums to verify that we saved the correct nums. Output is on SerialMonitor
         readEEPROMNums();
         
         //Send a confirmation back to user.
         
-        String msgText = "Hello user, You have register following numbers : \r\n";
+        String msgText = "Hello user, You have registered following numbers : \r\n";
         msgText += num1 + "\r\n";
         msgText += num2 + "\r\n";
         msgText += num3 + "\r\n";
@@ -206,8 +289,13 @@ boolean parseConfigMsg(String msg )
         
         Serial.println(msgText);
         
+        delay(500);
+        
         sim.write(msgText.c_str());
         
+        delay(500);
+        
+        return true;
     }
     
     else 
