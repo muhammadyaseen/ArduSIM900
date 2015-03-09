@@ -1,38 +1,30 @@
+#include <SoftwareSerial.h>
 #include <EEPROM.h>
-
-
-
 
 /*
 * constants here
 */
 
+SoftwareSerial sim(10,11);    // rx,tx
+
 bool interruptInProcess		= false;
-int baudRate 					= 115200;
-int networkLED					= 13;
-int powerLED					= 15;
-boolean stringComplete           = false;
+int baudRate 			= 9600;
+boolean stringComplete          = false;
 String  inputString = "";
-String testNums = "#@+923412260853@+923212260853@";
-
-int numCountAddr = 0;
-
-int numAddr = 10;
-
-
+String ctrlZ                    = "\x1A";
 void setup()
 {
 	inputString.reserve(300);
-
+        
+        initSIM900();
+        
 	setParameters();
-	
-	initSIM900();
 }
 
 void loop()
 {
 
-	if ( interruptReceived() && !interruptInProcess)
+	/*if ( interruptReceived() && !interruptInProcess)
 	{	
 		interruptInProcess = true;
 		
@@ -44,7 +36,12 @@ void loop()
 		
 		interruptInProcess = false;
 	}
-
+        */
+        if ( sim.available() > 0 )
+        {
+           softSerialEvent();
+           
+        }
         if ( stringComplete ) 
         {
           Serial.println(inputString);
@@ -56,52 +53,41 @@ void loop()
 void setParameters()
 {
 	//can set pin output modes, default values here
-	
-	Serial.begin(baudRate);
       
         //set module in 'text' mode
         
-        Serial.write("AT+CMGF=1\r");
-        //Send SMS msgs to Arduino serial port
+        sim.write("AT+CMGF=1\r");
         
+        //Send SMS msgs to Arduino serial port  
         //AT+ACNMI=mode,mt,bm,ds,bfr
-        Serial.write("AT+CNMI=2,2,0,0,0\r");
+        sim.write("AT+CNMI=2,2,0,0,0\r");
+        
+        Serial.println("Parameter setting done...");
 	
 }
 
 
 void initSIM900()
 {
+      
+        Serial.begin(baudRate);
+        
+        sim.begin(9600);
+        
 	//wait a few seconds for sim900 power on sequence to complete
-	delay(5000);
-	
-	//enter command mode
-	Serial.write("+++");
-	
-	//required for auto-bauding to figure out baud rate
-	Serial.write("AT");
-	
 	delay(3000);
 	
-        //Lets try autobauding for now
-	//switch to fixed bauding, and store the baud rate in non-volatile mem
-	/*switch (baudRate)
-	{
-		case 9600:
-			Serial.write("AT+IPR=9600;&W");
-			
-		case 38400:
-			Serial.write("AT+IPR=38400;&W");
-		
-		case 115200:
-			Serial.write("AT+IPR=115200;&W");
-		
-		default:
-			Serial.write("AT+IPR=9600;&W");
-	}
+	//enter command mode
+	sim.write("+++\r");
+	delay(500);
+
+	//required for auto-bauding to figure out baud rate
+	sim.write("AT\r");
 	
-	delay(2000);
-	*/
+	delay(3000);
+
+        Serial.println("SIm900 initialization done...");
+
 }
 
 void preCallSetup() {
@@ -145,19 +131,6 @@ void saveNumInPhonebook() {
 
 }
 
-void queryModuleInfo() {
-	
-	Serial.write("Firmware info : \n ");
-	Serial.write("AT+GMR\r");
-	
-	Serial.write("IMEI : \n");
-	Serial.write("AT+GSN\r");
-	
-	Serial.write("SIM number : \n");
-	Serial.write("AT+CNUM?\r");
-	
-}
-
 boolean interruptReceived() {
 
 	//TODO: implement switch check logic
@@ -166,27 +139,80 @@ boolean interruptReceived() {
 
 }
 
-boolean saveNumInEEPROM(String num)
+boolean parseConfigMsg(String msg )
 {
-    //e.g. +923412260853;  13 chars
+    //e.g. 03412260853;  11 chars
     
-    if ( num.charAt(0) == '#' && num.charAt(1) == '@' ) 
+    //#@5@03212260953@021356832@03453034303@03132260853@03334567798@#
+    
+    //#@<HowManyNums>@<Num 1>@<Num 2>@...@<Num N>@#  max N=5
+    
+    Serial.println("This is what I recvd");
+    
+    Serial.println(msg);
+    
+    if ( msg.startsWith("#@") && msg.endsWith("@#") )     //this is a config msg, we now extract the numbers
     {
-        int numCount = int( num.charAt(3) );
+        int numCount = int( msg.charAt(3) );
         
-        for ( int n = 0; n < numCount; n++ )
-        {
-           String currentNumber = "";
-           
-            while ( num.charAt(k) != '@')
-            {
-                  
-            }
-        }
+        Serial.println("YES : This is a config SMS");
+        //each num is/should be 11 digits long. 
+        
+        //First num is from index 4 to 15
+        String num1 = msg.substring(4,15);
+        
+        //Second num is from index 16 to 27
+        String num2 = msg.substring(16,27);
+        
+        //Third num is from index 28 to 39
+        String num3 = msg.substring(28,39);
+        
+        //Fourth num is from index 40 to 51
+        String num4 = msg.substring(40,51);
+        
+        //Fifth num is from index 52 to 63
+        String num5 = msg.substring(52,63);
+        
+        Serial.println(num1);
+        Serial.println(num2);
+        Serial.println(num3);
+        Serial.println(num4);
+        Serial.println(num5);
+        
+        //save numbers to Arduino's EEPROM
+        
+        /*saveToEEPROM(num1, 10);
+        
+        saveToEEPROM(num2, 21);
+        
+        saveToEEPROM(num3, 32);
+        
+        saveToEEPROM(num4, 43);
+        
+        saveToEEPROM(num5, 54);*/
+        
+        readEEPROMNums();
+        
+        //Send a confirmation back to user.
+        
+        String msgText = "Hello user, You have register following numbers : \r\n";
+        msgText += num1 + "\r\n";
+        msgText += num2 + "\r\n";
+        msgText += num3 + "\r\n";
+        msgText += num4 + "\r\n";
+        msgText += num5;
+        
+        msgText = "AT+CMGS=\"+923412260853\"\r" + ctrlZ + msgText ;
+        
+        Serial.println(msgText);
+        
+        sim.write(msgText.c_str());
+        
     }
     
     else 
-    {
+    {  
+       Serial.println("NO : This is NOT config SMS");
        return false; 
     }
 
@@ -206,3 +232,82 @@ void serialEvent() {
   }
 }
 
+void handleConfigMsg(String configMsg)
+{
+  Serial.println("SMS Msg received...");
+
+  // Example msg:
+  //+CMT: "+923412260853","Yaseen","15/03/08,16:52:19+20"
+  //#@03212260953@021356832@03453034303@03132260853@03334567798@#
+  
+  //We are interested in newline character bcz it follows msg body or <data> section of URC
+  Serial.println( " Newline char found at : ");
+  
+  int nlIndex = configMsg.indexOf('\n');
+  
+  Serial.print( nlIndex );
+
+  Serial.println(" Tranferring control to saveNumInEEPROM()");
+  
+  parseConfigMsg(configMsg.substring( nlIndex + 1));
+  
+}
+
+void softSerialEvent() {
+  
+  inputString = "";
+  
+  while (sim.available()) {
+    // get the new byte:
+    char inChar = (char)sim.read(); 
+    // add it to the inputString:
+    inputString += inChar;
+     
+  }
+  
+  String trimmed = String(inputString);
+  
+  trimmed.trim();
+  
+  if ( trimmed.startsWith("+CMT:") ) 
+  {
+      Serial.println("Yes, its a SMS msg");
+       handleConfigMsg( trimmed ); 
+  } else 
+  {
+      Serial.println("NO SMS msg");
+  }
+  stringComplete = true;
+  
+}
+
+void saveToEEPROM(String s, int startAddr)
+{
+  int i = 0;
+  
+  while ( i < 11 )
+  {
+     EEPROM.write(startAddr + i, s.charAt(i));
+    i++; 
+  }
+
+}
+
+//utility func, used to view contents of EEPROM
+void readEEPROMNums()
+{
+   int i = 10;
+   
+   Serial.println("reading ROM...");
+  
+  //Last num character is at 64
+  
+   while ( i < 65 )
+   {
+     char c = (char)EEPROM.read(i);
+     Serial.print(c);
+     i++;
+   }
+  
+  
+}
