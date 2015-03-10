@@ -361,6 +361,7 @@ void saveToEEPROM(String s, int startAddr)
   while ( i < 11 )
   {
      EEPROM.write(startAddr + i, s.charAt(i));
+     delay(10);
     i++; 
   }
 
