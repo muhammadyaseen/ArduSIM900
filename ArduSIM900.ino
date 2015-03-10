@@ -263,7 +263,7 @@ boolean parseConfigMsg(String msg )
         
         //Send a confirmation back to user.
         
-        String msgText = "Hello user, You have registered following numbers : \r\n";
+        /*String msgText = "Hello user, You have registered following numbers : \r\n";
         msgText += num1 + "\r\n";
         msgText += num2 + "\r\n";
         msgText += num3 + "\r\n";
@@ -279,7 +279,7 @@ boolean parseConfigMsg(String msg )
         sim.write(msgText.c_str());
         
         delay(500);
-        
+        */
         return true;
     }
     
@@ -312,6 +312,20 @@ void handleConfigMsg(String configMsg)
   // Example msg:
   //+CMT: "+923412260853","Yaseen","15/03/08,16:52:19+20"
   //#@03212260953@021356832@03453034303@03132260853@03334567798@#
+  
+  //TODO: 1. check from where the message came, 
+  //            -- extract sender's number
+  //            -- read first num in EEPOROM
+  //            -- compare both
+  
+  String storedNum = readFirstNum();
+  
+  if ( storedNum.equals( sendersNum) )
+  {
+  
+  }
+  
+  
   
   //We are interested in newline character bcz it follows msg body or <data> section of URC
   Serial.println( " Newline char found at : ");
@@ -381,6 +395,27 @@ void readEEPROMNums()
      Serial.print(c);
      i++;
    }
+}
+
+String readFirstNum()
+{
+   int i = 10;
+   
+   String num == "";
   
+   Serial.println("reading ROM...");
   
+  //Last num character is at 64
+  
+   while ( i < 22 )
+   {
+     char c = (char)EEPROM.read(i);
+     num += c;
+     i++;
+   }
+   
+   Serial.print( " Stored number is : ");
+   Serial.println(num);
+   
+   return num;
 }
