@@ -137,11 +137,6 @@ void initSIM900()
 
 }
 
-void preCallSetup() {
-
-	//we can check the balance/credit info here to inform if there is not enough balance etc
-}
-
 void makeCall() {
 	
         Serial.write("Initiating call...");
@@ -152,11 +147,6 @@ void makeCall() {
 
         interruptInProcess = false;
 
-}
-
-void postCallSetup() {
-	
-	//we can process any log,credit,time info here
 }
 
 void sendSMS() {
@@ -181,28 +171,6 @@ void sendSMS() {
          delay(500);
 }
 
-void SMSRecvd() {
-
-	//called when sim900 receives an SMS
-}
-
-void saveNumInPhonebook() {
-	
-	Serial.write("AT+CPBS=\"SM\"\r");
-	
-	//saves the number at location LOC in memory with name NAME
-	Serial.write("AT+CPBW=LOC,\"+3xxxxxxx\",92,\"NAME\"\r");
-
-}
-
-boolean interruptReceived() {
-
-	//TODO: implement switch check logic
-	
-	return true;
-
-}
-
 boolean parseConfigMsg(String msg )
 {
     //e.g. 03412260853;  11 chars
@@ -222,17 +190,11 @@ boolean parseConfigMsg(String msg )
         Serial.println("YES : This is a config SMS");
         //each num is/should be 11 digits long. 
         
-        //TODO: Extract the SENDER's number 
-        
-        
         //First num is from index 4 to 15
         String num1 = msg.substring(4,15);
         
         //Second num is from index 16 to 27
         String num2 = msg.substring(16,27);
-        
-        //Third num is from index 28 to 39
-        String num3 = msg.substring(28,39);
         
         //Fourth num is from index 40 to 51
         String num4 = msg.substring(40,51);
@@ -240,6 +202,9 @@ boolean parseConfigMsg(String msg )
         //Fifth num is from index 52 to 63
         String num5 = msg.substring(52,63);
         
+        //Third num is from index 28 to 39
+        String num3 = msg.substring(28,39);
+               
         Serial.println(num1);
         Serial.println(num2);
         Serial.println(num3);
@@ -262,23 +227,6 @@ boolean parseConfigMsg(String msg )
         readEEPROMNums();
         
         //Send a confirmation back to user.
-        
-        String msgText = "Hello user, You have registered following numbers : \r\n";
-        msgText += num1 + "\r\n";
-        msgText += num2 + "\r\n";
-        msgText += num3 + "\r\n";
-        msgText += num4 + "\r\n";
-        msgText += num5;
-        
-        msgText = "AT+CMGS=\"+923412260853\"\r" + ctrlZ + msgText ;
-        
-        Serial.println(msgText);
-        
-        delay(500);
-        
-        sim.write(msgText.c_str());
-        
-        delay(500);
         
         return true;
     }
@@ -313,8 +261,31 @@ void handleConfigMsg(String configMsg)
   //+CMT: "+923412260853","Yaseen","15/03/08,16:52:19+20"
   //#@03212260953@021356832@03453034303@03132260853@03334567798@#
   
+  //TODO: 1. check from where the message came, 
+  //            -- extract sender's number
+  //            -- read first num in EEPOROM
+  //            -- compare both
+  
+  String sendersNum = "0"+configMsg.substring(10,20);
+  
+  Serial.println( sendersNum);
+  
+  String storedNum = readFirstNum();
+ 
+   if ( storedNum.equals( sendersNum) )
+  {
+      Serial.println("OWNER's number... Config Numbers...");
+  }
+  else 
+  {
+    Serial.println("other source");
+    return;
+  }
+  
+  
+  
   //We are interested in newline character bcz it follows msg body or <data> section of URC
-  Serial.println( " Newline char found at : ");
+  Serial.println( "nl at : ");
   
   int nlIndex = configMsg.indexOf('\n');
   
@@ -382,6 +353,27 @@ void readEEPROMNums()
      Serial.print(c);
      i++;
    }
+}
+
+String readFirstNum()
+{
+   int i = 10;
+   
+   String num = "";
   
+   Serial.println("reading ROM...");
   
+  //Last num character is at 64
+  
+   while ( i < 21 )
+   {
+     char c = (char)EEPROM.read(i);
+     num += c;
+     i++;
+   }
+   
+   Serial.print( " Stored number is : ");
+   Serial.println(num);
+   
+   return num;
 }
