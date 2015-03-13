@@ -19,6 +19,8 @@ int lastButtonState           = LOW;   // the previous reading from the input pi
 long lastDebounceTime         = 0;  // the last time the output pin was toggled
 long debounceDelay            = 50;    // the debounce time; increase if the output flickers
 
+int numStartAddresses[] = { 10,21,32,43,54 };
+
 void setup()
 {
         pinMode(buttonPin, INPUT);
@@ -175,9 +177,10 @@ boolean parseConfigMsg(String msg )
 {
     //e.g. 03412260853;  11 chars
     
-    //#@5@03212260953@021356832@03453034303@03132260853@03334567798@#
+    //#@5@03212260953@#
     
-    //#@<HowManyNums>@<Num 1>@<Num 2>@...@<Num N>@#  max N=5
+    //#@<HowManyNums>@<Num>@#  
+    // max N=5
     
     Serial.println("This is what I recvd");
     
@@ -185,48 +188,45 @@ boolean parseConfigMsg(String msg )
     
     if ( msg.startsWith("#@") && msg.endsWith("@#") )     //this is a config msg, we now extract the numbers
     {
-        int numCount = int( msg.charAt(3) );
+        int numPos = msg.charAt(2) - '0';
         
         Serial.println("YES : This is a config SMS");
-        //each num is/should be 11 digits long. 
+        Serial.print("Num pos is : ");
+        Serial.println(numPos);
         
-        //First num is from index 4 to 15
-        String num1 = msg.substring(4,15);
+        String num = msg.substring(4,15); //extract the number
+        Serial.print("Extracted number : ");
+        Serial.print(num);
         
-        //Second num is from index 16 to 27
-        String num2 = msg.substring(16,27);
+        //determine where to save this number
+        switch (numPos)
+        {
+          case 1:
+            saveToEEPROM(num, 10);
+            break;
+          case 2:
+            saveToEEPROM(num, 21);
+            break;
+          case 3:
+            saveToEEPROM(num, 32);
+            break;
+          case 4:
+            saveToEEPROM(num, 43);
+            break;
+          case 5:
+            saveToEEPROM(num, 54);
+            break;
+          default:
+             Serial.println(" num range is 1-5 ");
+             return false;
+        }
         
-        //Fourth num is from index 40 to 51
-        String num4 = msg.substring(40,51);
-        
-        //Fifth num is from index 52 to 63
-        String num5 = msg.substring(52,63);
-        
-        //Third num is from index 28 to 39
-        String num3 = msg.substring(28,39);
-               
-        Serial.println(num1);
-        Serial.println(num2);
-        Serial.println(num3);
-        Serial.println(num4);
-        Serial.println(num5);
-        
-        //save numbers to Arduino's EEPROM
-        
-        saveToEEPROM(num1, 10);
-        
-        saveToEEPROM(num2, 21);
-        
-        saveToEEPROM(num3, 32);
-        
-        saveToEEPROM(num4, 43);
-        
-        saveToEEPROM(num5, 54);
-        
-        //We read nums to verify that we saved the correct nums. Output is on SerialMonitor
         readEEPROMNums();
         
-        //Send a confirmation back to user.
+        //TODO : Send a confirmation back to user.
+        String writtenNum = getNthNumber( numPos );
+        Serial.print("Written number : ");
+        Serial.print(writtenNum); 
         
         return true;
     }
@@ -268,11 +268,11 @@ void handleConfigMsg(String configMsg)
   
   String sendersNum = "0"+configMsg.substring(10,20);
   
-  Serial.println( sendersNum);
+  Serial.println(sendersNum);
   
   String storedNum = readFirstNum();
  
-   if ( storedNum.equals( sendersNum) )
+   if ( storedNum.equals(sendersNum) )
   {
       Serial.println("OWNER's number... Config Numbers...");
   }
@@ -281,9 +281,7 @@ void handleConfigMsg(String configMsg)
     Serial.println("other source");
     return;
   }
-  
-  
-  
+
   //We are interested in newline character bcz it follows msg body or <data> section of URC
   Serial.println( "nl at : ");
   
@@ -376,4 +374,25 @@ String readFirstNum()
    Serial.println(num);
    
    return num;
+}
+
+String getNthNumber(int n)
+{
+  String num = "";
+  int i = numStartAddresses[n-1];
+  int j = 0;
+  
+  Serial.println("reading ROM...");
+  
+  //Last num character is at 64
+  
+   while ( j < 11 )
+   {
+     char c = (char)EEPROM.read(i);
+     num += c;
+     i++;
+     j++;
+   }
+   
+  return num; 
 }
