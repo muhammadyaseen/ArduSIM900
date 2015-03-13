@@ -142,12 +142,57 @@ void initSIM900()
 void makeCall() {
 	
         Serial.write("Initiating call...");
+        
+        String callTo = "";
+        boolean endLoop = false;
+        
+        //TODO : call 1st,2nd... nth number
 	
-	sim.write("ATD+923412260853;\r");
-	
-	delay(3000);
+       for(int i = 1; i < 6; i++)
+       {
+         if ( endLoop ) break;  //if prev call was successfull, we can end loop
+         
+         // read ith num
+         callTo = "ATD" + getNthNumber(i) + ";\r";
+         
+         //initialize call to ith num
+         sim.write(callTo.c_str());
+         
+         delay(500);
+               
+         //create a local software serial event listener
+         String response = "";
+         
+         while( true )
+         {
+           if ( sim.available() > 0)
+           {
+             response += (char)sim.read();
+             Serial.println(response);
+           }
+           
+           response.trim();
+           
+           if ( response.equals("NO CARRIER") || response.equals("BUSY") || response.equals("NO ANSWER") || response.equals("ERROR") )
+           {
+                 if ( response.equals("NO CARRIER") ) endLoop = true;
+                 
+                 Serial.print("last response : ");
+                 Serial.println(response);
+                 break; 
+           }
+           
+           //Serial.println(response);
+         }
+               
+         // monitor status; if SUCCESS then we exit, 'break' the loop
+        
+         // in case of failure, we continue iteration
+       } 
 
-        interruptInProcess = false;
+       delay(3000);
+
+       interruptInProcess = false;
 
 }
 
