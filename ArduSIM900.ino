@@ -150,7 +150,10 @@ void makeCall() {
 	
        for(int i = 1; i < 6; i++)
        {
-         if ( endLoop ) break;  //if prev call was successfull, we can end loop
+         if ( endLoop ) {
+           Serial.println(" breaking out of for loop ");
+           break;  //if prev call was successfull, we can end loop   
+       }
          
          // read ith num
          callTo = "ATD" + getNthNumber(i) + ";\r";
@@ -173,21 +176,24 @@ void makeCall() {
            
            response.trim();
            
-           if ( response.equals("NO CARRIER") || response.equals("BUSY") || response.equals("NO ANSWER") || response.equals("ERROR") )
+           if ( response.length() > 17 )
            {
-                 if ( response.equals("NO CARRIER") ) endLoop = true;
-                 
-                 Serial.print("last response : ");
-                 Serial.println(response);
-                 break; 
+             String code = response.substring(17);
+             Serial.println(code);
+             
+             if ( code.equals("NOCARRIER") || code.equals("BUSY") || code.equals("NOANSWER") || code.equals("ERROR") )
+             {
+                   if ( code.equals("NOCARRIER") ) endLoop = true;
+                   
+                   Serial.print("last code: ");
+                   Serial.println(code);
+                   Serial.println(" breaking out of while true ");
+                   break; 
+             }
            }
            
            //Serial.println(response);
          }
-               
-         // monitor status; if SUCCESS then we exit, 'break' the loop
-        
-         // in case of failure, we continue iteration
        } 
 
        delay(3000);
