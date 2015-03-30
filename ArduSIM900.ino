@@ -1,25 +1,21 @@
 #include <SoftwareSerial.h>
 #include <EEPROM.h>
 
-/*
-* constants here
-*/
-
-SoftwareSerial sim(10,11);    // rx,tx
-
+SoftwareSerial sim(10,11);                    // rx,tx
 boolean interruptInProcess	= false;
 int baudRate 			= 9600;
+
 boolean stringComplete          = false;
-String  inputString = "";
-char ctrlZ                    = '\x1A';
-int buttonPin                 = 5; //btn is connected to this pin
-int buttonState;             // the current reading from the input pin
-int lastButtonState           = LOW;   // the previous reading from the input pin
+String  inputString             = "";
+char ctrlZ                      = '\x1A';
+int buttonPin                   = 5;           // push  button is connected to this pin
 
-long lastDebounceTime         = 0;  // the last time the output pin was toggled
-long debounceDelay            = 50;    // the debounce time; increase if the output flickers
+int buttonState;                               // the current reading from the input pin
+int lastButtonState             = LOW;         // the previous reading from the input pin  - used for debouncing
+long lastDebounceTime           = 0;           // the last time the output pin was toggled
+long debounceDelay              = 50;          // the debounce time; increase if the output flickers
 
-int numStartAddresses[] = { 10,21,32,43,54 };
+int numStartAddresses[] = { 10,21,32,43,54 };  //Starting address of stored numbers
 
 void setup()
 {
@@ -31,9 +27,6 @@ void setup()
         
 	setParameters();
 
-        //delay(1000);
-        
-        //sendSMS();
 }
 
 void loop()
@@ -45,6 +38,8 @@ void loop()
            softSerialEvent();
            
         }
+        
+        //Arduino Serial debugging
         if ( stringComplete ) 
         {
           Serial.println(inputString);
@@ -98,16 +93,13 @@ void checkPushButton()
   
 }
 void setParameters()
-{
-	//can set pin output modes, default values here
-      
+{     
         //set module in 'text' mode
-        
         sim.write("AT+CMGF=1\r");
         
         delay(500);
         
-        //Send SMS msgs to Arduino serial port  
+        //This configures the module to Send SMS msgs to Arduino serial port  
         //AT+ACNMI=mode,mt,bm,ds,bfr
         sim.write("AT+CNMI=2,2,0,0,0\r");
         
@@ -130,7 +122,7 @@ void initSIM900()
 	//sim.write("+++\r");
 	delay(500);
 
-	//required for auto-bauding to figure out baud rate
+	//required for auto-bauding to figure out baud rate of Arduino
 	sim.write("AT\r");
 	
 	delay(2000);
@@ -146,14 +138,14 @@ void makeCall() {
         String callTo = "";
         boolean endLoop = false;
         
-        //TODO : call 1st,2nd... nth number
+        //call 1st,2nd... nth number
 	
        for(int i = 1; i < 6; i++)
        {
          if ( endLoop ) {
            Serial.println(" breaking out of for loop ");
-           break;  //if prev call was successfull, we can end loop   
-       }
+           break;  //if prev call was successfull i.e. endLoop asserted, we can end loop   
+         }
          
          // read ith num
          callTo = "ATD" + getNthNumber(i) + ";\r";
@@ -174,16 +166,16 @@ void makeCall() {
              Serial.println(response);
            }
            
-           response.trim();
+           response.trim();                  //trim any special/space characters so that we can extract just the Response string
            
-           if ( response.length() > 17 )
+           if ( response.length() > 17 )     // len(ATD+923212282538;)= 17, if response is greater than this, it means SIM has sent some response code, which we need to extract
            {
-             String code = response.substring(17);
+             String code = response.substring(17);    //whatever is AFTER initial 17 characters is the response code
              Serial.println(code);
              
              if ( code.equals("NOCARRIER") || code.equals("BUSY") || code.equals("NOANSWER") || code.equals("ERROR") )
              {
-                   if ( code.equals("NOCARRIER") ) endLoop = true;
+                   if ( code.equals("NOCARRIER") ) endLoop = true;          //NOCARRIER is returned AFTER call has ended
                    
                    Serial.print("last code: ");
                    Serial.println(code);
@@ -191,10 +183,8 @@ void makeCall() {
                    break; 
              }
            }
-           
-           //Serial.println(response);
-         }
-       } 
+         }  //end while
+       }    //end for 
 
        delay(3000);
 
@@ -202,26 +192,28 @@ void makeCall() {
 
 }
 
+/* TEST function : 
+ *  This function can be used to Send SMS to stored numbers, 
+ *  for example as a response to some event, or an an acknowledgement of a received command etc
+ */
 void sendSMS() {
   
         String msgText = "Hello user, This is a test message \r\n";
-        
-       // msgText = "AT+CMGS=\"+923122009338\"\r" + msgText + ctrlZ ;
-        
-        //Serial.println(msgText);
-        
-        //sim.write( msgText.c_str());
+
         sim.write("AT+CMEE=2\r");
         delay(500);
-         sim.write("AT+CMEE?\r");
-          delay(500);
+
+        sim.write("AT+CMEE?\r");
+        delay(500);
           
         sim.print("AT+CMGS=\"+923412260853\"\r");
         delay(100);
+
         sim.print("Test");
         delay(100);
-        sim.write(0x1A);
-         delay(500);
+
+        sim.write(0x1A);      //CtrlZ character
+        delay(500);
 }
 
 boolean parseConfigMsg(String msg )
@@ -233,19 +225,21 @@ boolean parseConfigMsg(String msg )
     //#@<HowManyNums>@<Num>@#  
     // max N=5
     
+    //debug
     Serial.println("This is what I recvd");
     
     Serial.println(msg);
     
+    //check config msg pattern
     if ( msg.startsWith("#@") && msg.endsWith("@#") )     //this is a config msg, we now extract the numbers
     {
-        int numPos = msg.charAt(2) - '0';
+        int numPos = msg.charAt(2) - '0';                
         
         Serial.println("YES : This is a config SMS");
         Serial.print("Num pos is : ");
         Serial.println(numPos);
         
-        String num = msg.substring(4,15); //extract the number
+        String num = msg.substring(4,15);                 //extract the number
         Serial.print("Extracted number : ");
         Serial.print(num);
         
@@ -272,9 +266,12 @@ boolean parseConfigMsg(String msg )
              return false;
         }
         
-        readEEPROMNums();
+        //for debug
+        //readEEPROMNums();
         
-        //TODO : Send a confirmation back to user.
+        //TODO / Additional feature : Send a confirmation back to user.
+        
+        //Print back the saved number for debug purpose
         String writtenNum = getNthNumber( numPos );
         Serial.print("Written number : ");
         Serial.print(writtenNum); 
